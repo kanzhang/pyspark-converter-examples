@@ -1,28 +1,29 @@
 ---
 ---
 
-# Writing custom PySpark input/output converters
+# Writing custom Hadoop input/output converters for PySpark
 
 In Spark 1.1 release, PySpark API is enhanced with a set of methods to read/write Hadoop data files or stores, 
-using suitable Hadoop input/output formats. This feature is built on top of existing Scala/Java API methods. For 
+using suitable Hadoop ```InputFormats```/```OutputFormats```. This feature is built on top of existing 
+Scala/Java API methods. For
 it to work in Python environment, there needs to be a bridge that converts Java objects produced by Hadoop 
-input formats to something that can be handled by Pyrolite\'s pickler (which will then serialize the data into 
+```InputFormats``` to something that can be handled by Pyrolite\'s pickler (which will serialize the data into 
 Python objects usable by PySpark), and vice versa. For this purpose, a ```Converter``` trait is introduced, 
-along with a pair of default implementations that converts data to and from
+along with a pair of default implementations that convert data to and from
 Hadoop [Writables](http://hadoop.apache.org/docs/current/api/org/apache/hadoop/io/Writable.html) (i.e., 
 ```WritableToJavaConverter``` and ```JavaToWritableConverter```).
 
 Those default converters can only handle common Writable types. For custom Writables or non-Writable 
 serialization frameworks, users need to supply custom converters. For example, ```ArrayWritable``` cannot be 
-used to serialize arrays directly since it does not have a no-arg default constructor for deserializing. 
+used to serialize arrays directly since it does not have a default no-arg constructor for deserializing. 
 Users are expected to supply custom subclasses to handle arrays, which leads to custom converters.
 
 Some additional converters for reading from (and writing to) HBase and Cassandra are included in the examples 
 section of Spark distro, together with PySpark scripts that use them. Here, we will further illustrate the 
-steps in writing custom PySpark converters using [Apache Avro](http://avro.apache.org/docs/current/) serialization 
+steps in writing custom PySpark converters, using [Apache Avro](http://avro.apache.org/docs/current/) serialization 
 as an example.
 
-First thing to consider is what input data the converter will be getting. In our case, we intend to 
+One thing to consider is what input data the converter will be getting. In our case, we intend to 
 use the converter with ```AvroKeyInputFormat``` and the input data will be Avro records wrapped in an AvroKey. 
 Since we want to work with all 3 Avro data mappings (Generic, Specific and Reflect), for each Avro schema type,
 we need to handle all possible data types produced by those mappings. For example, for Avro ```BYTES``` type, 
@@ -45,7 +46,7 @@ both Generic and Specific mappings output ```java.nio.ByteBuffer```, while Refle
 
 Another thing to consider is what data types the converter will output, or equivalently, what data types 
 PySpark will see. For example, for Avro ```ARRAY``` type, the Reflect mapping may produce primitive arrays,
-Object arrays or ```java.util.Collection``` depends on its input. We want all of them to appear as 
+Object arrays or ```java.util.Collection``` depending on its input. We want all of them to appear as 
 Python ```List```, so we convert them all to ```java.util.Collection```,
 which will then be pickled into Python ```List``` by [Pyrolite](https://github.com/irmen/Pyrolite).
 
@@ -62,7 +63,7 @@ which will then be pickled into Python ```List``` by [Pyrolite](https://github.c
   }
 ```
 
-Finally, we need to handle nested data structures. This is done by recursive calling between individual 
+Finally, we need to handle nested data structures. This is done by recursively calling between individual 
 ```unpack*``` methods and the central switch ```fromAvro```, which handles the dispatching for all 14 
 Avro schema types.
 
@@ -101,4 +102,4 @@ One limitation of current ```Converter``` interface is the lack of means to set 
 converters. A future improvement could be, when instantiating converters, passing in the 
 Hadoop [Configuration](https://hadoop.apache.org/docs/current/api/org/apache/hadoop/conf/Configuration.html) object 
 used by associated MapReduce jobs. This Configuration object serves as the vehicle to pass in any custom configuration
-options users might need.
+options the converter might need.
