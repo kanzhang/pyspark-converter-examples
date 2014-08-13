@@ -102,4 +102,4 @@ One limitation of current ```Converter``` interface is the lack of means to set 
 converters. A future improvement could be, when instantiating converters, passing in the 
 Hadoop [Configuration](https://hadoop.apache.org/docs/current/api/org/apache/hadoop/conf/Configuration.html) object 
 used by associated MapReduce jobs. This Configuration object serves as the vehicle to pass in any custom configuration
-options the converter might need.
+options a converter might need.
