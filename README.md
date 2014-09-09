@@ -1,27 +1,42 @@
----
----
+# Bringing Hadoop Input/Output Format Support to PySpark
 
-# Writing custom Hadoop input/output converters for PySpark
+Two powerful features of Apache Spark include its native APIs provided in Scala, Java and Python, and its compatability with any Hadoop-based input or output source. This language support means that users can quickly become proficient in the use of Spark even without experience in Scala, and furthermore can leverage the extensive set of third-party libraries available (for example, the many data analysis libraries for Python).
 
-In Spark 1.1 release, PySpark API is enhanced with a set of methods to read/write Hadoop data files or stores, 
-using suitable Hadoop ```InputFormats```/```OutputFormats```. This feature is built on top of existing 
-Scala/Java API methods. For
-it to work in Python environment, there needs to be a bridge that converts Java objects produced by Hadoop 
-```InputFormats``` to something that can be handled by Pyrolite\'s pickler (which will serialize the data into 
-Python objects usable by PySpark), and vice versa. For this purpose, a ```Converter``` trait is introduced, 
-along with a pair of default implementations that convert data to and from
-Hadoop [Writables](http://hadoop.apache.org/docs/current/api/org/apache/hadoop/io/Writable.html) (i.e., 
-```WritableToJavaConverter``` and ```JavaToWritableConverter```).
+Built-in Hadoop support means that Spark can work "out the box" with any data storage system or format that implements Hadoop's `InputFormat` and `OutputFormat` interfaces for reading and writing data, including HDFS, HBase, Cassandra, Elasticsearch, DynamoDB and many others, as well as various data serialization formats such as SequenceFiles, Parquet, Avro, Thrift and protocol buffers.
 
-Those default converters can only handle common Writable types. For custom Writables or non-Writable 
-serialization frameworks, users need to supply custom converters. For example, ```ArrayWritable``` cannot be 
-used to serialize arrays directly since it does not have a default no-arg constructor for deserializing. 
-Users are expected to supply custom subclasses to handle arrays, which leads to custom converters.
+Previously, Hadoop InputFormat/OutputFormat support was provided only in Scala or Java. To access such data sources in Python, other than simple text files, users would need to first read the data in Scala or Java, and write it out as a text file for reading again in Python. With the release of Spark 1.1, Python users can now read and write their data directly from and to any Hadoop-compatible data source. 
 
-Some additional converters for reading from (and writing to) HBase and Cassandra are included in the examples 
-section of Spark distro, together with PySpark scripts that use them. Here, we will further illustrate the 
-steps in writing custom PySpark converters, using [Apache Avro](http://avro.apache.org/docs/current/) serialization 
-as an example.
+## An Example: Reading SequenceFiles
+
+[SequenceFile](http://wiki.apache.org/hadoop/SequenceFile) is the standard binary serialization format for Hadoop. It stores records of `Writable` key-value pairs, and supports splitting and compression. SequenceFiles are a commonly used format in particular for intermediate data storage in Map/Reduce pipelines, since they are more efficient than text files.
+
+Spark has long supported reading SequenceFiles natively using the `sequenceFile` method available on a `SparkContext` instance, which also utilizes Scala features to allow specifying the key and value type in the method call parameters. For example, to read a SequenceFile with `Text` keys and `DoubleWritable` values, we would do the following:
+
+```
+val rdd = sc.sequenceFile[String, Double](path)
+```
+
+Spark takes care of converting `Text` to `String` and `DoubleWritable` to `Double` for us automatically.
+
+The new PySpark API functionality exposes a `sequenceFile` method on a Python `SparkContext` instance that works in much the same way, with the key and value types being inferred by default: 
+
+```
+rdd = sc.sequenceFile(path)
+```
+
+## Under the Hood
+
+This feature is built on top of the existing Scala/Java API methods. For it to work in Python, there needs to be a bridge that converts Java objects produced by Hadoop```InputFormats``` to something that can be serialized into pickled Python objects usable by PySpark (and vice versa).
+
+For this purpose, a ```Converter``` trait is introduced, along with a pair of default implementations that handle the standard Hadoop [Writables](http://hadoop.apache.org/docs/current/api/org/apache/hadoop/io/Writable.html).
+
+## Custom Hadoop Converters for PySpark
+
+While the default converters handle the most common Writable types, users need to supply custom converters for custom Writables, or for serialization frameworks that do not produce Writables. To see an illustration of this, some additional converters for HBase and Cassandra, together with related PySpark scripts, are included in the Spark 1.1 example sub-project.
+
+## A More Detailed Example: Custom Converters for Avro
+
+For those who want to dive deeper, we will show how to write more complex custom PySpark converters, using the [Apache Avro](http://avro.apache.org/docs/current/) serialization format as an example.
 
 One thing to consider is what input data the converter will be getting. In our case, we intend to 
 use the converter with ```AvroKeyInputFormat``` and the input data will be Avro records wrapped in an AvroKey. 
@@ -45,10 +60,8 @@ both Generic and Specific mappings output ```java.nio.ByteBuffer```, while Refle
 ```
 
 Another thing to consider is what data types the converter will output, or equivalently, what data types 
-PySpark will see. For example, for Avro ```ARRAY``` type, the Reflect mapping may produce primitive arrays,
-Object arrays or ```java.util.Collection``` depending on its input. We want all of them to appear as 
-Python ```List```, so we convert them all to ```java.util.Collection```,
-which will then be pickled into Python ```List``` by [Pyrolite](https://github.com/irmen/Pyrolite).
+PySpark will see. For example, for the Avro ```ARRAY``` type, the Reflect mapping may produce primitive arrays,
+Object arrays or ```java.util.Collection``` depending on its input. We convert all of these to ```java.util.Collection```, which are in turn serialized into instances of a Python ```List```.
 
 ```
   def unpackArray(obj: Any, schema: Schema): java.util.Collection[Any] = obj match {
@@ -64,8 +77,7 @@ which will then be pickled into Python ```List``` by [Pyrolite](https://github.c
 ```
 
 Finally, we need to handle nested data structures. This is done by recursively calling between individual 
-```unpack*``` methods and the central switch ```fromAvro```, which handles the dispatching for all 14 
-Avro schema types.
+```unpack*``` methods and the central switch ```fromAvro```, which handles the dispatching for all Avro schema types.
 
 
 ```
@@ -94,12 +106,11 @@ Avro schema types.
   }
 ```
 
-The complete source code for ```AvroWrapperToJavaConverter``` is in ```AvroConverters.scala```, while example
-PySpark script for using the converter to read Avro files, in conjunction with ```AvroKeyInputFormat```, is given 
-in ```avro_inputformat.py```.
+The complete source code for ```AvroWrapperToJavaConverter``` can be found in the Spark examples, in ```AvroConverters.scala```, while the related PySpark script for using the converter is in ```avro_inputformat.py```.
 
-One limitation of current ```Converter``` interface is the lack of means to set custom configuration options for 
-converters. A future improvement could be, when instantiating converters, passing in the 
-Hadoop [Configuration](https://hadoop.apache.org/docs/current/api/org/apache/hadoop/conf/Configuration.html) object 
-used by associated MapReduce jobs. This Configuration object serves as the vehicle to pass in any custom configuration
-options a converter might need.
+## Conclusion and Future Work
+
+We're excited to bring this new feature to PySpark in the 1.1 release, and look forward to seeing how users make use of both the built-in functionality, and custom converters.
+
+One limitation of the current ```Converter``` interface is that there is no way to set custom configuration options. A future improvement could be to allow converters to take a 
+Hadoop [Configuration](https://hadoop.apache.org/docs/current/api/org/apache/hadoop/conf/Configuration.html) that would allow configuration at runtime.
