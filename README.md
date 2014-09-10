@@ -10,7 +10,7 @@ Previously, Hadoop InputFormat/OutputFormat support was provided only in Scala o
 
 [SequenceFile](http://wiki.apache.org/hadoop/SequenceFile) is the standard binary serialization format for Hadoop. It stores records of `Writable` key-value pairs, and supports splitting and compression. SequenceFiles are a commonly used format in particular for intermediate data storage in Map/Reduce pipelines, since they are more efficient than text files.
 
-Spark has long supported reading SequenceFiles natively using the `sequenceFile` method available on a `SparkContext` instance, which also utilizes Scala features to allow specifying the key and value type in the method call parameters. For example, to read a SequenceFile with `Text` keys and `DoubleWritable` values, we would do the following:
+Spark has long supported reading SequenceFiles natively using the `sequenceFile` method available on a `SparkContext` instance, which also utilizes Scala features to allow specifying the key and value type in the method call parameters. For example, to read a SequenceFile with `Text` keys and `DoubleWritable` values in Scala, we would do the following:
 
 ```
 val rdd = sc.sequenceFile[String, Double](path)
@@ -18,10 +18,14 @@ val rdd = sc.sequenceFile[String, Double](path)
 
 Spark takes care of converting `Text` to `String` and `DoubleWritable` to `Double` for us automatically.
 
-The new PySpark API functionality exposes a `sequenceFile` method on a Python `SparkContext` instance that works in much the same way, with the key and value types being inferred by default: 
+The new PySpark API functionality exposes a `sequenceFile` method on a Python `SparkContext` instance that works in much the same way, with the key and value types being inferred by default. The `saveAsSequenceFile` method available on a PySpark `RDD` allows users to save an `RDD` of key-value pairs as a SequenceFile. For example, we can create an `RDD` from a Python collection, save it as a SequenceFile, and read it back using the following code snippet:
 
 ```
-rdd = sc.sequenceFile(path)
+rdd = sc.parallelize([('key1', 1.0), ('key2', 2.0), ('key3', 3.0), ('key4', 4.0)])
+rdd.saveAsSequenceFile('/tmp/pysequencefile/')
+...
+sc.sequenceFile('/tmp/pysequencefile/').collect()
+[(u'key1', 1.0), (u'key2', 2.0), (u'key3', 3.0), (u'key4', 4.0)]
 ```
 
 ## Under the Hood
@@ -32,7 +36,7 @@ For this purpose, a ```Converter``` trait is introduced, along with a pair of de
 
 ## Custom Hadoop Converters for PySpark
 
-While the default converters handle the most common Writable types, users need to supply custom converters for custom Writables, or for serialization frameworks that do not produce Writables. To see an illustration of this, some additional converters for HBase and Cassandra, together with related PySpark scripts, are included in the Spark 1.1 example sub-project.
+While the default converters handle the most common Writable types, users need to supply custom converters for custom Writables, or for serialization frameworks that do not produce Writables. To see an illustration of this, some additional converters for [HBase](https://github.com/apache/spark/blob/master/examples/src/main/scala/org/apache/spark/examples/pythonconverters/HBaseConverters.scala) and [Cassandra](https://github.com/apache/spark/blob/master/examples/src/main/scala/org/apache/spark/examples/pythonconverters/CassandraConverters.scala), together with related [PySpark scripts](https://github.com/apache/spark/tree/master/examples/src/main/python), are included in the Spark 1.1 example sub-project.
 
 ## A More Detailed Example: Custom Converters for Avro
 
@@ -106,7 +110,7 @@ Finally, we need to handle nested data structures. This is done by recursively c
   }
 ```
 
-The complete source code for ```AvroWrapperToJavaConverter``` can be found in the Spark examples, in ```AvroConverters.scala```, while the related PySpark script for using the converter is in ```avro_inputformat.py```.
+The complete source code for ```AvroWrapperToJavaConverter``` can be found in the Spark examples, in [AvroConverters.scala](https://github.com/apache/spark/blob/master/examples/src/main/scala/org/apache/spark/examples/pythonconverters/AvroConverters.scala), while the related PySpark script for using the converter can be found [here](https://github.com/apache/spark/blob/master/examples/src/main/python/avro_inputformat.py).
 
 ## Conclusion and Future Work
 
