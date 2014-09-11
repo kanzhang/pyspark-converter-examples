@@ -2,7 +2,7 @@
 
 Two powerful features of Apache Spark include its native APIs provided in Scala, Java and Python, and its compatability with any Hadoop-based input or output source. This language support means that users can quickly become proficient in the use of Spark even without experience in Scala, and furthermore can leverage the extensive set of third-party libraries available (for example, the many data analysis libraries for Python).
 
-Built-in Hadoop support means that Spark can work "out the box" with any data storage system or format that implements Hadoop's `InputFormat` and `OutputFormat` interfaces for reading and writing data, including HDFS, HBase, Cassandra, Elasticsearch, DynamoDB and many others, as well as various data serialization formats such as SequenceFiles, Parquet, Avro, Thrift and protocol buffers.
+Built-in Hadoop support means that Spark can work "out the box" with any data storage system or format that implements Hadoop's `InputFormat` and `OutputFormat` interfaces for reading and writing data, including HDFS, HBase, Cassandra, Elasticsearch, DynamoDB and many others, as well as various data serialization formats such as SequenceFiles, Parquet, Avro, Thrift and Protocol Buffers.
 
 Previously, Hadoop InputFormat/OutputFormat support was provided only in Scala or Java. To access such data sources in Python, other than simple text files, users would need to first read the data in Scala or Java, and write it out as a text file for reading again in Python. With the release of Spark 1.1, Python users can now read and write their data directly from and to any Hadoop-compatible data source. 
 
